@@ -23,12 +23,37 @@ function App() {
 					"rYxfHudwM71RloulWxXvAbx0qPIRyIAxA38C7L6HdLfC031YrKnbeE9HhFr1G7iC",
 			});
 		}
+
 		socket = await client.empathicVoice.chat.connect({
 			configId: import.meta.env.VITE_HUME_WEATHER_ASSISTANT_CONFIG_ID || null,
 			resumedChatGroupId: chatGroupId,
 		});
 
-		socket.on("open", handleWebSocketOpenEvent);
+		socket.on("open", () => {
+			handleWebSocketOpenEvent();
+			const prompt = `
+You are an IELTS examiner. Your task is to conduct the IELTS Speaking Test. 
+Follow the structure of the IELTS Speaking test, which includes three parts:
+1. Part 1: Introduction and Interview - Ask the candidate about familiar topics like hobbies, daily routine, family, etc.
+2. Part 2: Long Turn - Ask the candidate to speak for 1-2 minutes on a given topic.
+3. Part 3: Discussion - Ask the candidate more abstract questions based on the Part 2 topic, encouraging deeper thought and discussion.
+
+During the test, you should assess the candidate’s speaking performance based on the IELTS Speaking Band Descriptors:
+- Fluency and Coherence
+- Lexical Resource
+- Grammatical Range and Accuracy
+- Pronunciation
+
+Provide feedback at the end of each part and give an overall band score according to the IELTS criteria.
+dont need to say that you are given a task, just start the conversation as an examiner.
+if the candidate stops speaking, you can ask follow-up questions to encourage them to speak more.
+`;
+
+			console.log(socket);
+			socket.sendUserInput(prompt);
+
+			// socket?.sendMessage(userMessage);
+		});
 		socket.on("message", handleSocketMessageEvent);
 	};
 
@@ -49,7 +74,13 @@ async function handleWebSocketOpenEvent() {
 	await captureAudio();
 }
 async function captureAudio() {
-	audioStream = await getAudioStream();
+	// audioStream = await getAudioStream();
+	audioStream = await navigator.mediaDevices.getUserMedia({
+		audio: true,
+		video: false,
+		echoCancellation: true,
+		noiseSuppression: true,
+	});
 	recorder = new MediaRecorder(audioStream);
 	recorder.ondataavailable = async ({ data }) => {
 		if (data.size < 1) return;
@@ -74,6 +105,11 @@ async function handleSocketMessageEvent(message) {
 		// append user and assistant messages to UI for chat visibility
 		case "user_message":
 		case "assistant_message":
+			console.log(
+				"🚀 ~ handleSocketMessageEvent ~ message.message",
+				message.message
+			);
+
 			const { role, content } = message.message;
 			const topThreeEmotions = extractTopThreeEmotions(message);
 			appendMessage(role, content ?? "", topThreeEmotions);
